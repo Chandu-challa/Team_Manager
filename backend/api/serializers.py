@@ -102,6 +102,11 @@ class PersonSerializer(serializers.ModelSerializer):
     district = serializers.IntegerField(source='team.district.id', read_only=True)
     constituency = serializers.IntegerField(source='team.constituency.id', read_only=True)
     mandal = serializers.IntegerField(source='team.mandal.id', read_only=True)
+    
+    state_name = serializers.CharField(source='team.state.name', read_only=True)
+    district_name = serializers.CharField(source='team.district.name', read_only=True)
+    constituency_name = serializers.CharField(source='team.constituency.name', read_only=True)
+    mandal_name = serializers.CharField(source='team.mandal.name', read_only=True)
 
     class Meta:
         model = Person
