@@ -98,21 +98,13 @@ export const dataAPI = {
   },
   getPersons: async (params) => {
     const response = await api.get("/persons/", { params });
-    if (response.data?.results) {
-      response.data.results.forEach(p => {
-        if (p.photo && typeof p.photo === 'string' && p.photo.startsWith('http')) {
-          try { p.photo = new URL(p.photo).pathname; } catch (e) {}
-        }
-      });
-    }
+
     return response.data;
   },
   getPerson: async (id) => {
     const response = await api.get(`/persons/${id}/`);
     const p = response.data;
-    if (p && p.photo && typeof p.photo === 'string' && p.photo.startsWith('http')) {
-      try { p.photo = new URL(p.photo).pathname; } catch (e) {}
-    }
+
     return p;
   },
   createPerson: async (data) => {
