@@ -1,0 +1,237 @@
+from django.db import models
+from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
+
+class User(AbstractUser):
+    ROLE_CHOICES = (
+        ('ADMIN', 'Admin'),
+        ('USER', 'User'),
+    )
+    full_name = models.CharField(max_length=255, blank=True)
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='USER')
+    phone = models.CharField(max_length=15, blank=True, null=True)
+    
+    email = models.EmailField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    USERNAME_FIELD = 'username'
+    REQUIRED_FIELDS = ['email']
+
+
+    def __str__(self):
+        return self.email
+
+class StateMaster(models.Model):
+    code = models.CharField(max_length=20, null=True, blank=True)
+    name = models.CharField(max_length=100, unique=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+    def __str__(self):
+        return self.name
+
+class DistrictMaster(models.Model):
+    state = models.ForeignKey(StateMaster, on_delete=models.CASCADE, related_name='districts')
+    code = models.CharField(max_length=20, null=True, blank=True)
+    name = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+
+    
+        constraints =  [models.UniqueConstraint(fields=['state', 'name'], name='unique_state_district')]
+
+
+    def __str__(self):
+        return self.name
+
+class ConstituencyMaster(models.Model):
+    district = models.ForeignKey(DistrictMaster, on_delete=models.CASCADE, related_name='constituencies')
+    code = models.CharField(max_length=20, null=True, blank=True)
+    name = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+
+    
+        constraints =  [models.UniqueConstraint(fields=['district', 'name'], name='unique_district_constituency')]
+
+
+    def __str__(self):
+        return self.name
+
+class MandalMaster(models.Model):
+    district = models.ForeignKey(DistrictMaster, on_delete=models.CASCADE, related_name='mandals')
+    code = models.CharField(max_length=20, null=True, blank=True)
+    name = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+
+
+        constraints =  [models.UniqueConstraint(fields=['district', 'name'], name='unique_district_mandal')]
+
+
+    def __str__(self):
+        return self.name
+
+class ConstituencyMandalMapping(models.Model):
+    constituency = models.ForeignKey(ConstituencyMaster, on_delete=models.CASCADE)
+    mandal = models.ForeignKey(MandalMaster, on_delete=models.CASCADE)
+    
+    class Meta:
+
+    
+        constraints =  [models.UniqueConstraint(fields=['constituency', 'mandal'], name='unique_constituency_mandal')]
+
+class TeamType(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    level = models.PositiveSmallIntegerField(default=1, help_text="Hierarchy level (e.g., 1=State, 2=District, 3=Constituency, 4=Mandal)")
+    description = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+
+    def __str__(self):
+        return f"{self.name} (Level {self.level})"
+
+class Team(models.Model):
+    name = models.CharField(max_length=150)
+    type = models.ForeignKey(TeamType, on_delete=models.CASCADE, related_name='teams')
+    
+    # Old parent reference, kept for migration safety
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='sub_teams')
+    
+    # New Hierarchy
+    state = models.ForeignKey(StateMaster, on_delete=models.RESTRICT, null=True, blank=True)
+    district = models.ForeignKey(DistrictMaster, on_delete=models.RESTRICT, null=True, blank=True)
+    constituency = models.ForeignKey(ConstituencyMaster, on_delete=models.RESTRICT, null=True, blank=True)
+    mandal = models.ForeignKey(MandalMaster, on_delete=models.RESTRICT, null=True, blank=True)
+    
+    description = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    class Meta:
+        unique_together = [['mandal', 'type']]
+
+    
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_teams')
+    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='updated_teams')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def clean(self):
+        if not self.type:
+            return
+
+        level = self.type.level
+        
+        # Level 1: State
+        if level >= 1:
+            if not self.state:
+                raise ValidationError({"state": "State is required for this Team Type."})
+        else:
+            if self.state:
+                raise ValidationError({"state": "State should be empty for this Team Type."})
+
+        # Level 2: District
+        if level >= 2:
+            if not self.district:
+                raise ValidationError({"district": "District is required for this Team Type."})
+            if self.district and self.state and self.district.state_id != self.state.id:
+                raise ValidationError({"district": "Selected District does not belong to the selected State."})
+        else:
+            if self.district:
+                raise ValidationError({"district": "District should be empty for this Team Type."})
+
+        # Level 3: Constituency
+        if level >= 3:
+            if not self.constituency:
+                raise ValidationError({"constituency": "Constituency is required for this Team Type."})
+            if self.constituency and self.district and self.constituency.district_id != self.district.id:
+                raise ValidationError({"constituency": "Selected Constituency does not belong to the selected District."})
+        else:
+            if self.constituency:
+                raise ValidationError({"constituency": "Constituency should be empty for this Team Type."})
+
+        # Level 4: Mandal
+        if level >= 4:
+            if not self.mandal:
+                raise ValidationError({"mandal": "Mandal is required for this Team Type."})
+            if self.mandal and self.district and self.mandal.district_id != self.district.id:
+                raise ValidationError({"mandal": "Selected Mandal does not belong to the selected District."})
+            if self.constituency and self.mandal:
+                if not ConstituencyMandalMapping.objects.filter(constituency=self.constituency, mandal=self.mandal).exists():
+                    raise ValidationError({"mandal": "Selected Mandal does not belong to the selected Constituency boundaries."})
+        else:
+            if self.mandal:
+                raise ValidationError({"mandal": "Mandal should be empty for this Team Type."})
+                
+        # Uniqueness check
+        qs = Team.objects.filter(
+            type=self.type, 
+            state=self.state, 
+            district=self.district, 
+            constituency=self.constituency, 
+            mandal=self.mandal,
+            name=self.name
+        )
+        if self.pk:
+            qs = qs.exclude(pk=self.pk)
+        if qs.exists():
+            raise ValidationError("A Team with this name and exact geographic location already exists for this Team Type.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    class Meta:
+        unique_together = [['mandal', 'type']]
+
+    def __str__(self):
+        parts = [self.name]
+        if self.mandal:
+            parts.append(self.mandal.name)
+        elif self.constituency:
+            parts.append(self.constituency.name)
+        elif self.district:
+            parts.append(self.district.name)
+        elif self.state:
+            parts.append(self.state.name)
+        
+        return f"{self.name} ({self.type.name})"
+
+class Person(models.Model):
+    name = models.CharField(max_length=200)
+    designation = models.CharField(max_length=100, null=True, blank=True)
+    phone = models.CharField(max_length=15)
+    email = models.EmailField()
+    address = models.TextField()
+    team = models.ForeignKey(Team, on_delete=models.RESTRICT, related_name='persons', null=True, blank=True)
+    photo = models.ImageField(upload_to='person_photos/', blank=True, null=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_persons')
+    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='updated_persons')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['team']),
+            models.Index(fields=['phone']),
+            models.Index(fields=['email']),
+            models.Index(fields=['created_at']),
+        ]
+
+
+    def __str__(self):
+        return self.name

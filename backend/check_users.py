@@ -1,0 +1,1 @@
+﻿import os; import django; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings'); django.setup(); from django.contrib.auth import get_user_model; User = get_user_model(); print([(u.username, u.email, u.check_password('adminpassword'), u.check_password('admin123')) for u in User.objects.all()])
