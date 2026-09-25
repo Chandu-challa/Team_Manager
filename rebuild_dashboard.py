@@ -1,4 +1,9 @@
-"use client";
+import re
+
+with open(r"D:\Team_Manager\frontend\src\app\(dashboard)\page.jsx", "r", encoding="utf-8") as f:
+    content = f.read()
+
+new_content = """"use client";
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
@@ -215,3 +220,12 @@ export default function DashboardPage() {
     </div>
   );
 }
+"""
+
+with open(r"D:\Team_Manager\frontend\src\app\(dashboard)\page.jsx", "w", encoding="utf-8") as f:
+    f.write(new_content)
+    
+with open(r"D:\Persons\frontend\src\app\(dashboard)\page.jsx", "w", encoding="utf-8") as f:
+    f.write(new_content)
+
+print("Dashboard fully rewritten to match UI/UX requirements!")
