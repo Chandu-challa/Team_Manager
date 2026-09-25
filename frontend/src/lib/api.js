@@ -2,6 +2,18 @@ import axios from "axios";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
+
+// Helper to ensure absolute media URLs
+const ensureAbsoluteUrl = (url) => {
+  if (!url) return url;
+  if (url.startsWith('http')) return url;
+  if (url.startsWith('/media')) {
+    const baseUrl = API_URL.replace('/api', '');
+    return `${baseUrl}${url}`;
+  }
+  return url;
+};
+
 const api = axios.create({
   baseURL: API_URL,
 });
@@ -96,15 +108,17 @@ export const dataAPI = {
     const response = await api.get("/dashboard/summary/");
     return response.data;
   },
-  getPersons: async (params) => {
+    getPersons: async (params) => {
     const response = await api.get("/persons/", { params });
-
+    if (response.data?.results) {
+      response.data.results.forEach(p => p.photo = ensureAbsoluteUrl(p.photo));
+    }
     return response.data;
   },
-  getPerson: async (id) => {
+    getPerson: async (id) => {
     const response = await api.get(`/persons/${id}/`);
     const p = response.data;
-
+    if (p) p.photo = ensureAbsoluteUrl(p.photo);
     return p;
   },
   createPerson: async (data) => {
