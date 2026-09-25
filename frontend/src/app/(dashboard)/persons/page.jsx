@@ -250,7 +250,7 @@ export default function PersonsPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex justify-end gap-2">
                         <Link href={`/persons/${person.id}/edit`} className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50")} onClick={(e) => e.stopPropagation()}>
                           <Edit className="h-4 w-4" />
                         </Link>
